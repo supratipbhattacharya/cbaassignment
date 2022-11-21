@@ -92,7 +92,6 @@ public class DataAnalytics {
 		
 		joinedCustomerDF = joinedCustomerDF.withColumn("date", to_date(joinedCustomerDF.col("date"), "d/MM/yyyy"));
 		joinedCustomerDF.show(52);
-		joinedCustomerDF.printSchema();
 		
 		//Dataset<Row> joinedCustomerBasedOnDays = joinedCustomerDF.withColumn("days_of_week", dayofweek(joinedCustomerDF.col("date")));
 		
@@ -104,16 +103,16 @@ public class DataAnalytics {
 		Dataset<Row> joinedCustomerBasedOnWedDays = joinedCustomerBasedOnDays.filter(joinedCustomerBasedOnDays.col("days_of_week").equalTo("Wed"));
 		joinedCustomerBasedOnWedDays.show(52);
 		
-		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnDays.withColumn("cap_total", joinedCustomerBasedOnWedDays.col("Total"));
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.withColumn("cap_total", joinedCustomerBasedOnWedDays.col("Total"));
 		joinedCustomerBasedOnWedDays.show(52);
 		
-		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.filter(joinedCustomerBasedOnWedDays.col("Total") + ">= 100");
-		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.withColumn("cap_total", lit(99));
-		joinedCustomerBasedOnWedDays.show(52);
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.filter(joinedCustomerBasedOnWedDays.col("total") + ">= 100");
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.withColumn("total", lit(99));
+		joinedCustomerBasedOnWedDays.show(114);
 		
 		joinedCustomerBasedOnDays = joinedCustomerBasedOnDays.groupBy(joinedCustomerBasedOnDays.col("days_of_week")).agg(sum(joinedCustomerBasedOnDays.col("total")));
 		
-		joinedCustomerBasedOnDays.show(52);
+		joinedCustomerBasedOnDays.show(114);
 	}
 
 	/**
