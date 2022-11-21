@@ -3,27 +3,25 @@
  */
 package com.tech.assignment.dataanalytics.serviceimpl;
 
-import java.util.Iterator;
-import java.util.List;
+import static org.apache.spark.sql.functions.concat;
+import static org.apache.spark.sql.functions.date_format;
+import static org.apache.spark.sql.functions.length;
+import static org.apache.spark.sql.functions.lit;
+import static org.apache.spark.sql.functions.sum;
+import static org.apache.spark.sql.functions.to_date;
 
-import javax.xml.validation.SchemaFactory;
-
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StringType;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
 import com.tech.assignment.dataanalytics.mapper.CustomerMapper;
 import com.tech.assignment.dataanalytics.mapper.TransactionsMapper;
 import com.tech.assignment.dataanalytics.models.Customer;
 import com.tech.assignment.dataanalytics.models.Transactions;
 import com.tech.assignment.dataanalytics.util.CommonConstants;
-import static org.apache.spark.sql.functions.*;
 
 /**
  * @author supratip
@@ -33,7 +31,6 @@ import static org.apache.spark.sql.functions.*;
 @Component
 public class DataAnalytics {
 
-	
 	public void findDataSet() {
 		
 		try {
@@ -47,39 +44,42 @@ public class DataAnalytics {
 			Dataset<Row> customerDF = readCustomerData(sparkSession);
 			Dataset<Row> transactionDF = readTransactionsData(sparkSession);
 			
+			//Mask customer post code
 			maskCustomerPostCode(customerDF);
 			
+			//Apply 5 years of age bucketing
 			ageBucketing(customerDF);
 			
+			//Filter customer younger than 20
 			filterCustomerBasedOnAge(customerDF);
 			
+			//Join customer and transactions
 			Dataset<Row> joinedCustomerDF = customerDF.join(transactionDF, customerDF.col("personId").equalTo(transactionDF.col("customerId")));
-//			.select(customerDF.col("personId"),
-//					customerDF.col("postcode"),
-//					customerDF.col("state"),
-//					customerDF.col("gender"),
-//					customerDF.col("age"),
-//					customerDF.col("accountType"),
-//					customerDF.col("loyalCustomer")
-//					);
-			joinedCustomerDF.show(52);
 			
-			findDayWiseTransaction(joinedCustomerDF);
-			
+			//Update Loyal_Customer flag
 			updateLoyalCustomer(joinedCustomerDF);
 			
+			//Filter Summary of spending by days of week
+			findDayWiseTransaction(joinedCustomerDF);
+			
 			//Filter out customers that did not transact at all
-			Dataset<Row> customerNotTransactDF = customerDF.join(transactionDF, customerDF.col("personId").notEqual(transactionDF.col("customerId")));
-			customerNotTransactDF.show(52);
+			Dataset<Row> customerNotTransactDF = customerDF.join(transactionDF, customerDF.col("personId").notEqual(transactionDF.col("customerId")))
+					.select(customerDF.col("personId"),
+							customerDF.col("postcode"),
+							customerDF.col("state"),
+							customerDF.col("gender"),
+							customerDF.col("age"),
+							customerDF.col("accountType"),
+							customerDF.col("loyalCustomer")
+							);
+			customerNotTransactDF.show(114);
 			
-			//filter out transactions of customers that do not present in the customer dataset
-			Dataset<Row> customerNotPresentDF = transactionDF.join(customerDF, transactionDF.col("customerId").notEqual(customerDF.col("personId")));
-			customerNotPresentDF.show(52);
-			
+			//Filter out transactions of customers that do not present in the customer dataset
+			Dataset<Row> transactionNotPresentDF = transactionDF.join(customerDF, customerDF.col("personId").equalTo(transactionDF.col("customerId")), "left_anti");
+			transactionNotPresentDF.show(112);
 			
 			
 		} catch (Exception e) {
-			System.out.println();
 			e.printStackTrace();
 		}
 	}
@@ -89,9 +89,6 @@ public class DataAnalytics {
 	 * @param joinedCustomerDF
 	 */
 	private void findDayWiseTransaction(Dataset<Row> joinedCustomerDF) {
-		
-		//joinedCustomerDF = joinedCustomerDF.withColumn(null, null);
-		//Dataset<Row> joinedCustomerDFMonday = joinedCustomerDF.filter((joinedCustomerDF.col("date.date")) + "= 1");
 		
 		joinedCustomerDF = joinedCustomerDF.withColumn("date", to_date(joinedCustomerDF.col("date"), "d/MM/yyyy"));
 		joinedCustomerDF.show(52);
@@ -117,7 +114,6 @@ public class DataAnalytics {
 		joinedCustomerBasedOnDays = joinedCustomerBasedOnDays.groupBy(joinedCustomerBasedOnDays.col("days_of_week")).agg(sum(joinedCustomerBasedOnDays.col("total")));
 		
 		joinedCustomerBasedOnDays.show(52);
-		
 	}
 
 	/**
@@ -140,7 +136,7 @@ public class DataAnalytics {
 		
 		joinedCustomerDF = joinedCustomerLoyalDF.union(joinedCustomerNonLoyalDF);
 		
-		joinedCustomerDF.show(52);
+		joinedCustomerDF.show(114);
 	}
 
 	/**
@@ -150,9 +146,8 @@ public class DataAnalytics {
 	private void filterCustomerBasedOnAge(Dataset<Row> customerDF) {
 		
 		customerDF = customerDF.filter(
-				customerDF.col("age") + "> 20");
-		
-		customerDF.show(52);
+				customerDF.col("age") + "< 20");
+		customerDF.show(114);
 	}
 
 	/**
@@ -161,11 +156,13 @@ public class DataAnalytics {
 	 */
 	private void ageBucketing(Dataset<Row> customerDF) {
 		
-		
 		converAgeBucket(customerDF);
-		
 	}
 
+	/**
+	 * 
+	 * @param customerDF
+	 */
 	private void converAgeBucket(Dataset<Row> customerDF) {
 
 		Dataset<Row> customerFDF = customerDF.filter(customerDF.col("age") + ">=15")
