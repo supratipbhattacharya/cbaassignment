@@ -9,7 +9,7 @@ import com.tech.assignment.dataanalytics.models.Customer;
 
 /**
  * @author supratip
- *
+ * Map Customer csv in Customer model
  */
 public class CustomerMapper implements MapFunction<Row, Customer> {
 

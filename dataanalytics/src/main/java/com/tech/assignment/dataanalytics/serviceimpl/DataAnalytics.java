@@ -3,6 +3,7 @@
  */
 package com.tech.assignment.dataanalytics.serviceimpl;
 
+import java.util.Iterator;
 import java.util.List;
 
 import javax.xml.validation.SchemaFactory;
@@ -101,9 +102,22 @@ public class DataAnalytics {
 		Dataset<Row> joinedCustomerBasedOnDays = joinedCustomerDF.withColumn("days_of_week", date_format(joinedCustomerDF.col("date"), "E"));
 		joinedCustomerBasedOnDays.select(joinedCustomerBasedOnDays.col("date"), joinedCustomerBasedOnDays.col("total"), joinedCustomerBasedOnDays.col("days_of_week")).show(52);
 		joinedCustomerBasedOnDays = joinedCustomerBasedOnDays.filter(joinedCustomerBasedOnDays.col("days_of_week").isNotNull());
+		joinedCustomerBasedOnDays.show(52);
+		
+		Dataset<Row> joinedCustomerBasedOnWedDays = joinedCustomerBasedOnDays.filter(joinedCustomerBasedOnDays.col("days_of_week").equalTo("Wed"));
+		joinedCustomerBasedOnWedDays.show(52);
+		
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnDays.withColumn("cap_total", joinedCustomerBasedOnWedDays.col("Total"));
+		joinedCustomerBasedOnWedDays.show(52);
+		
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.filter(joinedCustomerBasedOnWedDays.col("Total") + ">= 100");
+		joinedCustomerBasedOnWedDays = joinedCustomerBasedOnWedDays.withColumn("cap_total", lit(99));
+		joinedCustomerBasedOnWedDays.show(52);
+		
 		joinedCustomerBasedOnDays = joinedCustomerBasedOnDays.groupBy(joinedCustomerBasedOnDays.col("days_of_week")).agg(sum(joinedCustomerBasedOnDays.col("total")));
 		
 		joinedCustomerBasedOnDays.show(52);
+		
 	}
 
 	/**
@@ -142,13 +156,47 @@ public class DataAnalytics {
 	}
 
 	/**
-	 * 
+	 * Age column apply 5 years bucketing
 	 * @param customerDF
 	 */
 	private void ageBucketing(Dataset<Row> customerDF) {
-		// TODO Auto-generated method stub
+		
+		
+		converAgeBucket(customerDF);
 		
 	}
+
+	private void converAgeBucket(Dataset<Row> customerDF) {
+
+		Dataset<Row> customerFDF = customerDF.filter(customerDF.col("age") + ">=15")
+				.filter(customerDF.col("age") + "<= 19");
+		customerFDF = customerFDF.withColumn("age_range", concat(lit("["), lit(15), lit("-"), lit(19), lit("]")));
+		customerFDF.show(52);
+
+		Dataset<Row> customerSDF = customerDF.filter(customerDF.col("age") + ">=20")
+		         .filter(customerDF.col("age") + "<= 24");
+		customerSDF = customerSDF.withColumn("age_range", concat(lit("["), lit(20), lit("-"), lit(24), lit("]")));
+		customerSDF.show(52);
+		
+		Dataset<Row> customerTDF = customerDF.filter(customerDF.col("age") + ">=30")
+		         .filter(customerDF.col("age") + "<= 34");
+		customerTDF = customerTDF.withColumn("age_range", concat(lit("["), lit(30), lit("-"), lit(34), lit("]")));
+		customerTDF.show(52);
+		
+		Dataset<Row> customerFoDF = customerDF.filter(customerDF.col("age") + ">=40")
+		         .filter(customerDF.col("age") + "<= 44");
+		customerFoDF = customerFoDF.withColumn("age_range", concat(lit("["), lit(40), lit("-"), lit(44), lit("]")));
+		customerFoDF.show(52);
+		
+		Dataset<Row> customerFiDF = customerDF.filter(customerDF.col("age") + ">=50")
+		         .filter(customerDF.col("age") + "<= 54");
+		customerFiDF = customerFiDF.withColumn("age_range", concat(lit("["), lit(50), lit("-"), lit(54), lit("]")));
+		customerFiDF.show(52);
+		
+		customerDF = customerFDF.union(customerSDF).union(customerTDF).union(customerFoDF).union(customerFiDF);
+		customerDF.show(112);
+	}
+		
 
 	/**
 	 * For each combination of state, gender and age mask postcode of the
@@ -166,7 +214,7 @@ public class DataAnalytics {
 		
 		//Masked postcode based on the above filtered output
 		customerDF = customerDF.withColumn("postcode", lit(CommonConstants.MASKED_POST_CODE));
-		customerDF.show(52);
+		customerDF.show(50);
 	}
 
 	/**
@@ -181,14 +229,11 @@ public class DataAnalytics {
 		
 		//Create DataSet from customer DataFrame using map function and user defined Customer model
 		Dataset<Customer> customerDS = df.map(new CustomerMapper(), Encoders.bean(Customer.class));
-		
-		System.out.println("*****Customer ingested in a dataset: *****");
-		//customerDS.printSchema();
+		customerDS.printSchema();
 		
 		//Convert Customer DataSet to DataFrame
 		Dataset<Row> customerDF = customerDS.toDF();
-		
-		//customerDF.show(50);
+		customerDF.show(50);
 		
 		return customerDF;
 	}
@@ -207,7 +252,6 @@ public class DataAnalytics {
 		//Create DataSet from customer DataFrame using map function and map into user defined Transactions model
 		Dataset<Transactions> transactionDS = df.map(new TransactionsMapper(), Encoders.bean(Transactions.class));
 		
-		System.out.println("*****Transactions ingested in a dataset: *****");
 		transactionDS.printSchema();
 		
 		//Convert Customer DataSet to DataFrame
@@ -227,7 +271,7 @@ public class DataAnalytics {
 	 */
 	private Dataset<Row> getDataSet(SparkSession sparkSession, String fileUrl) {
 		Dataset<Row> df = sparkSession.read().format("csv")
-		        .option("inferSchema", "true") // Make sure to use string version of true
+		        .option("inferSchema", "true")
 		        .option("header", true)
 		        .option("sep", ",")
 		        .load(fileUrl);
